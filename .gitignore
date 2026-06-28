@@ -1,26 +1,15 @@
-# Environment variables
-
 # Python
+backend/venv/
+backend/.env
 __pycache__/
 *.pyc
 *.pyo
-venv/
-*.egg-info/
+.cognee_system/
 
-# Node.js
-node_modules/
-dist/
-build/
+# Node
+frontend/node_modules/
+frontend/dist/
 
-# Cognee data
-backend/cognee_data/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
+# System
 .DS_Store
-Thumbs.db
+*.env

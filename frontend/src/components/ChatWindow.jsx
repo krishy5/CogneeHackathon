@@ -1,360 +1,377 @@
 import { useState, useRef, useEffect } from "react"
-import { SvgIcons } from "../icons"
 
-// ─── Markdown Renderer ────────────────────────────────────────────────────────
-
-function renderMarkdown(text) {
-  const lines = text.split("\n")
-  const elements = []
-  let key = 0
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-
-    if (line.startsWith("### ")) {
-      elements.push(<div key={key++} style={{ fontSize: "13px", fontWeight: "700", color: "var(--text-primary)", marginTop: "16px", marginBottom: "6px" }}>{inline(line.slice(4))}</div>)
-      continue
-    }
-    if (line.startsWith("## ")) {
-      elements.push(<div key={key++} style={{ fontSize: "14.5px", fontWeight: "800", color: "var(--text-primary)", marginTop: "20px", marginBottom: "8px" }}>{inline(line.slice(3))}</div>)
-      continue
-    }
-    if (line.startsWith("- ") || line.startsWith("• ")) {
-      elements.push(
-        <div key={key++} style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
-          <span style={{ color: "var(--accent-indigo)", flexShrink: 0, marginTop: "1px" }}>•</span>
-          <span>{inline(line.slice(2))}</span>
-        </div>
-      )
-      continue
-    }
-    const numberedMatch = line.match(/^(\d+)\.\s(.+)/)
-    if (numberedMatch) {
-      elements.push(
-        <div key={key++} style={{ display: "flex", gap: "8px", marginTop: "6px" }}>
-          <span style={{ color: "var(--accent-indigo)", fontWeight: "600", flexShrink: 0, minWidth: "16px" }}>{numberedMatch[1]}.</span>
-          <span>{inline(numberedMatch[2])}</span>
-        </div>
-      )
-      continue
-    }
-    if (line.trim() === "") {
-      elements.push(<div key={key++} style={{ height: "10px" }} />)
-      continue
-    }
-    elements.push(<div key={key++} style={{ marginTop: "6px", lineHeight: "1.65" }}>{inline(line)}</div>)
-  }
-  return elements
-}
-
-function inline(text) {
-  const parts = []
-  let remaining = text
-  let k = 0
-
-  while (remaining.length > 0) {
-    const boldMatch = remaining.match(/^(.*?)\*\*(.+?)\*\*/)
-    const codeMatch = remaining.match(/^(.*?)`(.+?)`/)
-    const italicMatch = remaining.match(/^(.*?)\*(.+?)\*/)
-
-    const matches = [
-      boldMatch && { type: "bold", index: boldMatch[1].length, match: boldMatch },
-      codeMatch && { type: "code", index: codeMatch[1].length, match: codeMatch },
-      italicMatch && { type: "italic", index: italicMatch[1].length, match: italicMatch },
-    ].filter(Boolean).sort((a, b) => a.index - b.index)
-
-    if (matches.length === 0) {
-      parts.push(<span key={k++}>{remaining}</span>)
-      break
-    }
-
-    const first = matches[0]
-    const [full, before, content] = first.match
-
-    if (before) parts.push(<span key={k++}>{before}</span>)
-
-    if (first.type === "bold") {
-      parts.push(<strong key={k++} style={{ color: "var(--text-primary)", fontWeight: "700" }}>{content}</strong>)
-    } else if (first.type === "code") {
-      parts.push(
-        <code key={k++} style={{
-          background: "var(--bg-input)", border: "1px solid var(--border-medium)",
-          borderRadius: "6px", padding: "2px 6px", fontSize: "12.5px",
-          fontFamily: "'JetBrains Mono', monospace", color: "var(--text-primary)"
-        }}>{content}</code>
-      )
-    } else if (first.type === "italic") {
-      parts.push(<em key={k++} style={{ fontStyle: "italic" }}>{content}</em>)
-    }
-
-    remaining = remaining.slice(full.length)
-  }
-  return parts
-}
-
-// ─── Typing Indicator ─────────────────────────────────────────────────────────
-
-function TypingIndicator() {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "16px", paddingLeft: "4px", marginBottom: "16px", animation: "fadeIn 0.3s ease-out" }}>
-      <div style={{
-        width: "32px", height: "32px", borderRadius: "10px",
-        background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        color: "#fff", flexShrink: 0, animation: "pulseSync 2s infinite"
-      }}><SvgIcons.Sparkles size={16} /></div>
-      <div style={{
-        background: "var(--bg-surface)", border: "1px solid var(--border-medium)",
-        borderRadius: "16px 16px 16px 4px",
-        padding: "14px 20px", display: "flex", flexDirection: "column", gap: "8px",
-        boxShadow: "var(--shadow-sm)", minWidth: "180px"
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <div style={{ fontSize: "12px", fontWeight: "700", color: "var(--accent-indigo)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-            Querying Mem0 Graph
-          </div>
-          <div style={{ display: "flex", gap: "3px" }}>
-            {[0, 1, 2].map(i => (
-              <div key={i} style={{
-                width: "4px", height: "4px", borderRadius: "50%", background: "var(--accent-indigo)",
-                animation: `typingDot 1.2s ease-in-out ${i * 0.2}s infinite`
-              }} />
-            ))}
-          </div>
-        </div>
-        
-        {/* Animated Graph / Equalizer */}
-        <div style={{ display: "flex", alignItems: "flex-end", gap: "3px", height: "18px", opacity: 0.8 }}>
-          {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19].map((i) => {
-            const delay = Math.random() * 1.5;
-            const dur = 0.5 + Math.random() * 0.8;
-            return (
-              <div key={i} style={{
-                width: "4px", borderRadius: "2px",
-                background: `linear-gradient(to top, var(--accent-indigo), var(--accent-violet))`,
-                animation: `floatUp ${dur}s ease-in-out ${delay}s infinite alternate`,
-                height: `${20 + Math.random() * 80}%`
-              }} />
-            )
-          })}
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Main ChatWindow ──────────────────────────────────────────────────────────
-
-export default function ChatWindow({
-  projectId,
-  projects = [],
-  messages,
-  loading,
-  error,
-  input,
-  setInput,
-  handleSend,
-  handleFeedback,
-  onInspiration,
-  onBack
+export default function ChatWindow({ 
+  projectId, 
+  messages, 
+  loading, 
+  error, 
+  input, 
+  setInput, 
+  handleSend, 
+  handleFeedback, 
+  onInspiration, 
+  onBack 
 }) {
-  const [feedbackState, setFeedbackState] = useState({})
+  const [feedbackState, setFeedbackState] = useState({}) // { [msgIndex]: 'thumbsup' | 'thumbsdown' }
   const messagesEndRef = useRef(null)
 
+  // Scroll to bottom on new messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, loading])
 
   const clickFeedback = (index, type, content) => {
-    setFeedbackState(prev => ({ ...prev, [index]: prev[index] === type ? null : type }))
+    setFeedbackState(prev => ({
+      ...prev,
+      [index]: prev[index] === type ? null : type
+    }))
     handleFeedback(type, content)
   }
 
-  const project = projects.find(p => p.id === projectId)
-  const projectName = project?.name || "Design Workspace"
-  const projectColor = project?.color || "#6366f1"
+  // Get project name
+  const getProjectName = () => {
+    if (projectId === "proj_001") return "Luminary App"
+    if (projectId === "proj_002") return "Forge Design System"
+    if (projectId === "proj_003") return "Nova Brand"
+    return projectId || "Design Workspace"
+  }
 
   return (
-    <div style={{ flex: 1, display: "flex", flexDirection: "column", background: "var(--bg-canvas)", height: "100%" }}>
-
-      {/* ── TOP BAR ── */}
+    <div style={{
+      flex: 1,
+      display: "flex",
+      flexDirection: "column",
+      background: "#f4f5f7",
+      height: "100%",
+      position: "relative"
+    }}>
+      
+      {/* Top Bar (Matches reference header bar layout: tabs on left, actions on right) */}
       <div style={{
-        padding: "0 32px", borderBottom: "1px solid var(--border-medium)",
-        background: "var(--bg-surface)", height: "68px", flexShrink: 0,
-        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "16px 24px",
+        borderBottom: "1px solid #e5e7eb",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        background: "#ffffff",
         zIndex: 5
       }}>
+        {/* Left Side: Tabs / Workspace Title */}
         <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <button onClick={onBack} style={{
-            background: "transparent", border: "none", color: "var(--text-secondary)",
-            cursor: "pointer", display: "flex", alignItems: "center", gap: "8px",
-            padding: "8px", borderRadius: "8px", transition: "all 0.15s"
-          }}
-            onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.background = "var(--bg-input)" }}
-            onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.background = "transparent" }}>
-            <SvgIcons.ArrowLeft size={18} />
+          <button 
+            onClick={onBack} 
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#64748b",
+              cursor: "pointer",
+              fontSize: "13.5px",
+              fontWeight: "600",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              padding: "6px 12px",
+              borderRadius: "8px",
+              transition: "all 0.2s"
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.color = "#0f172a"
+              e.currentTarget.style.background = "#f1f5f9"
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.color = "#64748b"
+              e.currentTarget.style.background = "transparent"
+            }}
+          >
+            ← Dashboard
           </button>
-          <div style={{ width: "1px", height: "24px", background: "var(--border-medium)" }} />
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <div style={{
-              width: "32px", height: "32px", borderRadius: "10px",
-              background: `var(--bg-input)`, border: `1px solid var(--border-medium)`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-              color: projectColor
-            }}><SvgIcons.Message size={16} /></div>
-            <span style={{ fontSize: "16px", fontWeight: "700", color: "var(--text-primary)", fontFamily: "'Outfit', sans-serif" }}>
-              {projectName}
+
+          <div style={{
+            width: "1px",
+            height: "20px",
+            backgroundColor: "#e2e8f0"
+          }} />
+
+          {/* Active Workspace Label */}
+          <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+            <span style={{ fontSize: "16px" }}>💬</span>
+            <span style={{
+              fontSize: "15px",
+              fontWeight: "700",
+              color: "#0f172a",
+              fontFamily: "'Outfit', sans-serif"
+            }}>
+              {getProjectName()}
             </span>
           </div>
         </div>
 
-        <button onClick={onInspiration} style={{
-          background: "var(--bg-surface)", border: "1px solid var(--border-medium)",
-          color: "var(--text-secondary)", borderRadius: "10px", padding: "9px 16px",
-          cursor: "pointer", fontSize: "13px", fontWeight: "600",
-          display: "flex", alignItems: "center", gap: "8px", transition: "all 0.15s",
-          boxShadow: "var(--shadow-sm)"
-        }}
-          onMouseEnter={e => { e.currentTarget.style.color = "var(--text-primary)"; e.currentTarget.style.borderColor = "var(--border-strong)" }}
-          onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.borderColor = "var(--border-medium)" }}>
-          <SvgIcons.Image size={16} /> Inspiration Refs
-        </button>
+        {/* Right Side: Tab Buttons + Share Action */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <button 
+            onClick={onInspiration}
+            style={{
+              background: "transparent",
+              border: "1px solid #e2e8f0",
+              color: "#475569",
+              borderRadius: "10px",
+              padding: "8px 16px",
+              cursor: "pointer",
+              fontSize: "13px",
+              fontWeight: "600",
+              display: "flex",
+              alignItems: "center",
+              gap: "6px",
+              transition: "all 0.15s"
+            }}
+            onMouseEnter={e => {
+              e.currentTarget.style.background = "#f8fafc"
+              e.currentTarget.style.borderColor = "#cbd5e1"
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.background = "transparent"
+              e.currentTarget.style.borderColor = "#e2e8f0"
+            }}
+          >
+            🖼 Inspiration Board
+          </button>
+          
+          <button style={{
+            background: "#09090b",
+            color: "#ffffff",
+            border: "none",
+            borderRadius: "10px",
+            padding: "8px 18px",
+            fontSize: "13px",
+            fontWeight: "600",
+            cursor: "pointer",
+            transition: "all 0.15s"
+          }} onMouseEnter={e => e.currentTarget.style.opacity = 0.9} onMouseLeave={e => e.currentTarget.style.opacity = 1}>
+            Share
+          </button>
+        </div>
       </div>
 
-      {/* ── MESSAGES ── */}
+      {/* Messages Stream */}
       <div style={{
-        flex: 1, overflowY: "auto", padding: "40px 48px",
-        display: "flex", flexDirection: "column", gap: "24px"
+        flex: 1,
+        overflowY: "auto",
+        padding: "32px",
+        display: "flex",
+        flexDirection: "column",
+        gap: "24px"
       }}>
-        {messages.length === 0 && !loading && (
-          <div style={{ textAlign: "center", padding: "60px 20px", animation: "fadeSlideUp 0.4s ease-out" }}>
-            <div style={{
-              width: "72px", height: "72px", borderRadius: "20px", margin: "0 auto 24px",
-              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-              display: "flex", alignItems: "center", justifyContent: "center", color: "#fff",
-              boxShadow: "0 12px 30px rgba(99,102,241,0.25)"
-            }}><SvgIcons.Sparkles size={36} /></div>
-            <div style={{ fontSize: "22px", fontWeight: "800", color: "var(--text-primary)", fontFamily: "'Outfit', sans-serif", marginBottom: "12px" }}>
-              StudioMind is ready
-            </div>
-            <div style={{ fontSize: "14.5px", color: "var(--text-secondary)", maxWidth: "420px", margin: "0 auto", lineHeight: "1.6" }}>
-              Start by describing your project aesthetic, typography goals, or color preferences. I remember context across your workspace.
-            </div>
-          </div>
-        )}
-
         {messages.map((msg, i) => {
           const isUser = msg.role === "user"
           return (
-            <div key={i} style={{
-              display: "flex", flexDirection: isUser ? "row-reverse" : "row",
-              alignItems: "flex-start", gap: "16px", animation: "fadeSlideUp 0.3s ease-out forwards"
-            }}>
-              {!isUser && (
-                <div style={{
-                  width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
-                  background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "#fff", marginTop: "4px"
-                }}><SvgIcons.Sparkles size={16} /></div>
-              )}
-              {isUser && (
-                <div style={{
-                  width: "32px", height: "32px", borderRadius: "10px", flexShrink: 0,
-                  background: "var(--bg-input)", border: "1px solid var(--border-medium)",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  color: "var(--text-muted)", marginTop: "4px"
-                }}><SvgIcons.User size={16} /></div>
-              )}
-
-              <div style={{ maxWidth: "75%", display: "flex", flexDirection: "column", gap: "8px", alignItems: isUser ? "flex-end" : "flex-start" }}>
-                <div style={{
-                  background: isUser ? "var(--accent-indigo)" : "var(--bg-surface)",
-                  border: isUser ? "none" : "1px solid var(--border-medium)",
-                  borderRadius: isUser ? "16px 16px 4px 16px" : "4px 16px 16px 16px",
-                  padding: "16px 20px", fontSize: "14px", lineHeight: "1.6",
-                  color: isUser ? "#fff" : "var(--text-secondary)",
-                  boxShadow: isUser ? "0 8px 20px rgba(99,102,241,0.25)" : "var(--shadow-sm)"
-                }}>
-                  {isUser ? msg.content : renderMarkdown(msg.content)}
-                </div>
-
-                {!isUser && i > 0 && (
-                  <div style={{ display: "flex", gap: "8px" }}>
-                    {["thumbsup", "thumbsdown"].map(type => {
-                      const active = feedbackState[i] === type
-                      const isUp = type === "thumbsup"
-                      return (
-                        <button key={type} onClick={() => clickFeedback(i, type, msg.content)}
-                          style={{
-                            background: active ? (isUp ? "#f0fdf4" : "#fef2f2") : "var(--bg-surface)",
-                            border: `1px solid ${active ? (isUp ? "#bbf7d0" : "#fecaca") : "var(--border-medium)"}`,
-                            color: active ? (isUp ? "#16a34a" : "#dc2626") : "var(--text-muted)",
-                            borderRadius: "8px", padding: "6px 10px", cursor: "pointer", transition: "all 0.15s"
-                          }}
-                          onMouseEnter={e => { if(!active) e.currentTarget.style.background = "var(--bg-input)" }}
-                          onMouseLeave={e => { if(!active) e.currentTarget.style.background = "var(--bg-surface)" }}>
-                          {isUp ? <SvgIcons.ThumbsUp size={14} /> : <SvgIcons.ThumbsDown size={14} />}
-                        </button>
-                      )
-                    })}
-                  </div>
-                )}
+            <div 
+              key={i} 
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: isUser ? "flex-end" : "flex-start",
+                animation: "fadeSlideIn 0.3s ease-out forwards"
+              }}
+            >
+              {/* Message bubble */}
+              <div style={{
+                maxWidth: "75%",
+                background: isUser 
+                  ? "linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)" 
+                  : "#ffffff",
+                border: isUser 
+                  ? "none" 
+                  : "1px solid #eef0f3",
+                borderRadius: isUser ? "20px 20px 4px 20px" : "20px 20px 20px 4px",
+                padding: "16px 20px",
+                fontSize: "14px",
+                lineHeight: "1.6",
+                color: isUser ? "#ffffff" : "#334155",
+                boxShadow: isUser 
+                  ? "0 4px 15px rgba(139, 92, 246, 0.2)" 
+                  : "0 4px 20px rgba(0, 0, 0, 0.03)",
+                whiteSpace: "pre-wrap"
+              }}>
+                {msg.content}
               </div>
+              
+              {/* Feedback Buttons */}
+              {!isUser && i > 0 && (
+                <div style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "12px",
+                  marginTop: "8px",
+                  paddingLeft: "6px"
+                }}>
+                  <span style={{ fontSize: "11px", color: "#94a3b8", fontWeight: "700", textTransform: "uppercase" }}>
+                    StudioMind Partner
+                  </span>
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <button 
+                      onClick={() => clickFeedback(i, "thumbsup", msg.content)} 
+                      style={{
+                        background: feedbackState[i] === "thumbsup" ? "#ecfdf5" : "transparent",
+                        border: `1px solid ${feedbackState[i] === "thumbsup" ? "#10b981" : "#e2e8f0"}`,
+                        color: feedbackState[i] === "thumbsup" ? "#10b981" : "#94a3b8",
+                        borderRadius: "8px",
+                        padding: "4px 8px",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        transition: "all 0.15s"
+                      }}
+                      title="This was helpful"
+                    >
+                      👍
+                    </button>
+                    <button 
+                      onClick={() => clickFeedback(i, "thumbsdown", msg.content)} 
+                      style={{
+                        background: feedbackState[i] === "thumbsdown" ? "#fef2f2" : "transparent",
+                        border: `1px solid ${feedbackState[i] === "thumbsdown" ? "#ef4444" : "#e2e8f0"}`,
+                        color: feedbackState[i] === "thumbsdown" ? "#ef4444" : "#94a3b8",
+                        borderRadius: "8px",
+                        padding: "4px 8px",
+                        cursor: "pointer",
+                        fontSize: "12px",
+                        transition: "all 0.15s"
+                      }}
+                      title="This wasn't helpful"
+                    >
+                      👎
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )
         })}
-        {loading && <TypingIndicator />}
+        
+        {/* Loading Indicator */}
+        {loading && (
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", paddingLeft: "6px" }}>
+            <div style={spinnerStyle} />
+            <span style={{ color: "#64748b", fontSize: "13px", fontWeight: "500" }}>
+              StudioMind is checking graph memory...
+            </span>
+          </div>
+        )}
+
+        {/* Error Alert */}
         {error && (
           <div style={{
-            color: "#dc2626", fontSize: "13px", padding: "16px 20px",
-            background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "12px",
-            display: "flex", gap: "10px", alignItems: "center"
+            color: "#ef4444",
+            fontSize: "13.5px",
+            padding: "12px 18px",
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            borderRadius: "12px",
+            maxWidth: "90%"
           }}>
-            <SvgIcons.X size={16} /> <span>{error}</span>
+            ⚠️ {error}
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      {/* ── INPUT BAR ── */}
-      <div style={{ padding: "24px 48px", background: "var(--bg-surface)", borderTop: "1px solid var(--border-medium)" }}>
+      {/* Input Footer Box (Inspired by the comment textbox at the bottom of reference image) */}
+      <div style={{
+        padding: "24px 32px",
+        borderTop: "1px solid #e5e7eb",
+        background: "#ffffff",
+        display: "flex",
+        flexDirection: "column",
+        gap: "8px"
+      }}>
         <div style={{
-          display: "flex", gap: "12px", alignItems: "flex-end",
-          background: "var(--bg-input)", border: "1px solid var(--border-strong)",
-          borderRadius: "16px", padding: "12px 12px 12px 20px",
-          transition: "all 0.2s"
-        }} id="input-wrapper">
-          <textarea
+          fontSize: "11px",
+          color: "#94a3b8",
+          fontWeight: "700",
+          textTransform: "uppercase",
+          letterSpacing: "0.08em"
+        }}>
+          Activity Chat Session
+        </div>
+        
+        <div style={{ display: "flex", gap: "12px", width: "100%" }}>
+          <input
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend() } }}
-            placeholder="Describe your design vision..."
+            onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
+            placeholder="Leave a comment or design partner request..."
             disabled={loading}
-            rows={1}
-            onFocus={() => { const w = document.getElementById("input-wrapper"); if(w) { w.style.borderColor = "var(--accent-indigo)"; w.style.boxShadow = "0 0 0 3px rgba(99,102,241,0.15)" } }}
-            onBlur={() => { const w = document.getElementById("input-wrapper"); if(w) { w.style.borderColor = "var(--border-strong)"; w.style.boxShadow = "none" } }}
             style={{
-              flex: 1, background: "transparent", border: "none", color: "var(--text-primary)",
-              fontSize: "14.5px", outline: "none", resize: "none", lineHeight: "1.6",
-              padding: "6px 0", maxHeight: "140px", overflowY: "auto", fontFamily: "'Inter', sans-serif"
+              flex: 1,
+              background: "#ffffff",
+              border: "1px solid #e5e7eb",
+              borderRadius: "12px",
+              padding: "14px 18px",
+              color: "#1e293b",
+              fontSize: "13.5px",
+              outline: "none",
+              transition: "all 0.2s"
+            }}
+            onFocus={e => {
+              e.currentTarget.style.borderColor = "#8b5cf6"
+              e.currentTarget.style.boxShadow = "0 0 0 3px rgba(139, 92, 246, 0.1)"
+            }}
+            onBlur={e => {
+              e.currentTarget.style.borderColor = "#e5e7eb"
+              e.currentTarget.style.boxShadow = "none"
             }}
           />
-          <button onClick={handleSend} disabled={loading || !input.trim()} style={{
-            background: loading || !input.trim() ? "var(--border-medium)" : "var(--accent-indigo)",
-            color: loading || !input.trim() ? "var(--text-muted)" : "#fff",
-            border: "none", borderRadius: "12px", width: "44px", height: "44px",
-            cursor: loading || !input.trim() ? "not-allowed" : "pointer",
-            display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
-            transition: "all 0.2s", boxShadow: loading || !input.trim() ? "none" : "0 4px 12px rgba(99,102,241,0.3)"
-          }}>
-            <SvgIcons.Send size={18} />
+          
+          <button 
+            onClick={handleSend} 
+            disabled={loading || !input.trim()} 
+            style={{
+              background: loading || !input.trim() 
+                ? "#e2e8f0" 
+                : "linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%)",
+              color: loading || !input.trim() ? "#94a3b8" : "#ffffff",
+              border: "none",
+              borderRadius: "12px",
+              padding: "14px 28px",
+              cursor: loading || !input.trim() ? "not-allowed" : "pointer",
+              fontSize: "13.5px",
+              fontWeight: "600",
+              transition: "all 0.2s"
+            }}
+            onMouseEnter={e => {
+              if (!loading && input.trim()) {
+                e.currentTarget.style.transform = "scale(1.02)"
+                e.currentTarget.style.boxShadow = "0 4px 12px rgba(139, 92, 246, 0.2)"
+              }
+            }}
+            onMouseLeave={e => {
+              e.currentTarget.style.transform = "scale(1)"
+              e.currentTarget.style.boxShadow = "none"
+            }}
+          >
+            Send Prompts
           </button>
         </div>
-        <div style={{ marginTop: "12px", textAlign: "center", fontSize: "11px", color: "var(--text-muted)", fontWeight: "500" }}>
-          Powered by Google Gemini · Press Enter to send, Shift+Enter for new line
-        </div>
       </div>
+
+      <style>{`
+        @keyframes fadeSlideIn {
+          from { opacity: 0; transform: translateY(8px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes rotateSpinner {
+          from { transform: rotate(0deg); }
+          to { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   )
+}
+
+const spinnerStyle = {
+  width: "16px",
+  height: "16px",
+  border: "2px solid rgba(0,0,0,0.05)",
+  borderTop: "2px solid #8b5cf6",
+  borderRadius: "50%",
+  animation: "rotateSpinner 1s linear infinite"
 }

@@ -1,126 +1,103 @@
-from mem0 import Memory
+import cognee
 import os
 
-# Initialize Mem0
-mem0_config = {
-    "vector_store": {
-        "provider": "qdrant",
-        "config": {
-            "collection_name": "studiomind",
-            "embedding_model_dims": 384,
-            "on_disk": True,
-            "path": "./mem0_data"
-        }
-    }
-}
+def is_valid_key(key: str) -> bool:
+    return bool(key and not key.startswith("PLACEHOLDER") and key.strip() != "")
 
-memory = None
+async def init_cognee():
+    """Call this once at app startup. Configures Cognee with API keys and providers."""
+    openai_key = os.getenv("OPENAI_API_KEY")
+    glm_key = os.getenv("GLM_API_KEY") or os.getenv("ZHIPUAI_API_KEY")
+    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
 
-async def init_memory():
-    """Initialize Mem0 memory system."""
-    global memory
-    try:
-        os.makedirs("./mem0_data", exist_ok=True)
-        memory = Memory.from_config(mem0_config)
-        print("Mem0 initialized successfully.")
-    except Exception as e:
-        print(f"Error initializing Mem0: {e}")
+    if is_valid_key(glm_key):
+        # Configure Cognee for GLM AI (Zhipu) using its OpenAI-compatible interface
+        cognee.config.set_llm_provider("openai")
+        cognee.config.set_llm_endpoint("https://open.bigmodel.cn/api/paas/v4/")
+        cognee.config.set_llm_api_key(glm_key)
+        cognee.config.set_llm_model(os.getenv("GLM_MODEL", "glm-4-flash"))
+        
+        cognee.config.set_embedding_provider("openai")
+        cognee.config.set_embedding_endpoint("https://open.bigmodel.cn/api/paas/v4/")
+        cognee.config.set_embedding_api_key(glm_key)
+        cognee.config.set_embedding_model(os.getenv("GLM_EMBEDDING_MODEL", "embedding-2"))
+        print("Cognee configured for GLM AI (Zhipu).")
+        
+    elif is_valid_key(openai_key):
+        # Configure Cognee for OpenAI (ChatGPT)
+        cognee.config.set_llm_provider("openai")
+        cognee.config.set_llm_model(os.getenv("OPENAI_MODEL", "gpt-4o-mini"))
+        cognee.config.set_llm_api_key(openai_key)
+        if os.getenv("OPENAI_API_BASE"):
+            cognee.config.set_llm_endpoint(os.getenv("OPENAI_API_BASE"))
+            
+        cognee.config.set_embedding_provider("openai")
+        cognee.config.set_embedding_model(os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small"))
+        cognee.config.set_embedding_api_key(openai_key)
+        if os.getenv("OPENAI_API_BASE"):
+            cognee.config.set_embedding_endpoint(os.getenv("OPENAI_API_BASE"))
+        print("Cognee configured for OpenAI.")
+        
+    elif is_valid_key(anthropic_key):
+        # Configure Cognee for Anthropic
+        cognee.config.set_llm_provider("anthropic")
+        cognee.config.set_llm_model("claude-3-5-sonnet-20241022")
+        cognee.config.set_llm_api_key(anthropic_key)
+        print("Cognee configured for Anthropic.")
 
 async def save_memory(text: str, project_id: str) -> None:
-    """Store conversation using Mem0's add() method."""
-    global memory
-    if memory:
-        memory.add(text, user_id=project_id)
+    """
+    Stores text into the project-scoped memory namespace.
+    dataset_name ensures memories from different projects don't bleed into each other.
+    Call this AFTER every LLM response to remember the exchange.
+    """
+    await cognee.remember(text, dataset_name=f"project_{project_id}")
 
 async def fetch_memory(query: str, project_id: str) -> str:
-    """Retrieve relevant memories using Mem0's search() method."""
-    global memory
-    if not memory:
-        return ""
-    
-    # Search memories for this project
-    results = memory.search(query, user_id=project_id, limit=5)
-    
+    """
+    Retrieves semantically relevant memory for a query.
+    Returns a string (may be empty if nothing relevant found).
+    Call this BEFORE every LLM call.
+    """
+    results = await cognee.recall(
+        query=query,
+        dataset_name=f"project_{project_id}"
+    )
     if not results:
         return ""
-    
-    # Extract memory content
-    memories = []
-    for result in results:
-        if isinstance(result, dict) and "memory" in result:
-            memories.append(result["memory"])
-        elif isinstance(result, str):
-            memories.append(result)
-    
-    return "\n".join(memories)
+    return "\n".join([str(r) for r in results])
 
 async def ingest_url(url: str, project_id: str) -> None:
-    """Store URL reference using Mem0."""
-    global memory
-    if memory:
-        memory.add(f"Reference URL: {url}", user_id=project_id)
+    """
+    Ingests a URL (Dribbble, Behance, Pinterest, etc.) into project memory.
+    Cognee fetches and parses the page content automatically.
+    """
+    await cognee.remember(url, dataset_name=f"project_{project_id}")
 
 async def improve_memory(feedback: str, project_id: str) -> None:
-    """Store user feedback using Mem0."""
-    global memory
-    if memory:
-        memory.add(f"User feedback: {feedback}", user_id=project_id)
+    """
+    Called when user clicks 👍 or 👎 on an assistant message.
+    feedback string format: "thumbsup: <the message content>" or "thumbsdown: <the message content>"
+    """
+    await cognee.improve(feedback, dataset_name=f"project_{project_id}")
 
 async def get_style_dna(user_id: str) -> str:
-    """Analyze patterns across all projects using Mem0."""
-    global memory
-    if not memory:
+    """
+    Cross-project recall — traverses ALL of a user's projects via graph search.
+    Used for the Style DNA page.
+    dataset_name uses user_id (not project_id) to span all projects.
+    """
+    results = await cognee.recall(
+        query="What are the consistent design patterns, color preferences, typography choices, and aesthetic tendencies across all projects?",
+        dataset_name=f"user_{user_id}"
+    )
+    if not results:
         return ""
-    
-    # Get all memories related to design patterns
-    queries = [
-        "design patterns and preferences",
-        "color and typography choices",
-        "layout and spacing preferences"
-    ]
-    
-    all_memories = []
-    for query in queries:
-        results = memory.search(query, user_id=user_id, limit=10)
-        if results:
-            for result in results:
-                if isinstance(result, dict) and "memory" in result:
-                    all_memories.append(result["memory"])
-                elif isinstance(result, str):
-                    all_memories.append(result)
-    
-    if not all_memories:
-        return "Not enough conversation data for style DNA analysis yet. Keep chatting!"
-    
-    # Analyze patterns
-    content_text = " ".join(all_memories).lower()
-    patterns = []
-    
-    if "dark" in content_text or "light" in content_text or "white" in content_text:
-        patterns.append("Theme Preference: Consistent use of light/dark color schemes")
-    
-    if "font" in content_text or "typography" in content_text:
-        patterns.append("Typography: Strong focus on font selection and hierarchy")
-    
-    if "spacing" in content_text or "margin" in content_text:
-        patterns.append("Layout: Attention to whitespace and spacing")
-    
-    if "palette" in content_text or "color" in content_text:
-        patterns.append("Color Theory: Active exploration of color palettes")
-    
-    if "minimal" in content_text or "clean" in content_text:
-        patterns.append("Design Philosophy: Minimalist, clean aesthetics")
-    
-    return "\n".join(patterns) if patterns else "Style DNA analysis in progress..."
+    return "\n".join([str(r) for r in results])
 
 async def delete_project_memory(project_id: str) -> None:
-    """Delete all memories for a project using Mem0."""
-    global memory
-    if memory:
-        # Get all memories for this user
-        all_memories = memory.get_all(user_id=project_id)
-        # Delete each memory
-        if all_memories:
-            for mem in all_memories:
-                if isinstance(mem, dict) and "id" in mem:
-                    memory.delete(mem["id"])
+    """
+    Permanently removes all memory for a project.
+    Called when user deletes a project from the dashboard.
+    """
+    await cognee.forget(dataset_name=f"project_{project_id}")
