@@ -1,0 +1,30 @@
+# Environment variables
+.env
+.env.local
+*.env
+api.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+*.egg-info/
+
+# Node.js
+node_modules/
+dist/
+build/
+
+# Cognee data
+backend/cognee_data/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
