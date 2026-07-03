@@ -51,24 +51,18 @@ export default function Chat({ projectId, onBack, onInspiration }) {
     const userText = input.trim()
     setInput("")
     setError(null)
-    
-    // Add user message optimistically
-    const updatedMessages = [...messages, { role: "user", content: userText }]
-    setMessages(updatedMessages)
+
+    const userMsg = { role: "user", content: userText }
+    setMessages(prev => [...prev, userMsg])
     setLoading(true)
-    
+
     try {
-      // API call (goes through local storage mock or real API fetch)
       const result = await sendMessage(userText, projectId)
-      
-      const newMessagesList = [...updatedMessages, { role: "assistant", content: result.reply }]
-      setMessages(newMessagesList)
-      
-      // Update memory panel with what Cognee recalled
+      setMessages(prev => [...prev, { role: "assistant", content: result.reply }])
       setMemory(result.recalled_memory || "")
     } catch (err) {
       console.error(err)
-      setError("Failed to communicate with StudioMind partner. Please check your connection.")
+      setError("Failed to communicate with StudioMind. Please check your connection.")
     } finally {
       setLoading(false)
     }
@@ -92,7 +86,7 @@ export default function Chat({ projectId, onBack, onInspiration }) {
   }
 
   return (
-    <div style={{ display: "flex", height: "100vh", width: "100vw", overflow: "hidden" }}>
+    <div style={{ display: "flex", height: "100%", width: "100%", overflow: "hidden" }}>
       {/* Central Chat Window Area */}
       <ChatWindow
         projectId={projectId}

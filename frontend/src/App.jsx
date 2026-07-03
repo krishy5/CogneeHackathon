@@ -3,6 +3,7 @@ import Dashboard from "./pages/Dashboard"
 import Chat from "./pages/Chat"
 import StyleDNA from "./pages/StyleDNA"
 import Inspiration from "./pages/Inspiration"
+import MemoryGraph from "./pages/MemoryGraph"
 
 const DEMO_USER_ID = "user_demo_001"
 const SEED_PROJECTS = [
@@ -12,7 +13,7 @@ const SEED_PROJECTS = [
 ]
 
 export default function App() {
-  const [page, setPage] = useState("dashboard") // dashboard | chat | dna | inspiration
+  const [page, setPage] = useState("dashboard") // dashboard | chat | dna | inspiration | memory-graph
   const [activeProjectId, setActiveProjectId] = useState(null)
   const [projects, setProjects] = useState([])
   const [searchQuery, setSearchQuery] = useState("")
@@ -169,15 +170,8 @@ export default function App() {
               outline: "none"
             }}
           />
-          <span style={{
-            position: "absolute",
-            left: "10px",
-            top: "50%",
-            transform: "translateY(-50%)",
-            fontSize: "13px",
-            color: "#94a3b8"
-          }}>
-            🔍
+          <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", color: "#94a3b8", pointerEvents: "none" }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           </span>
           {/* Keyboard badge ⌘ S */}
           <span style={{
@@ -202,9 +196,10 @@ export default function App() {
           <span style={sidebarHeaderStyle}>General</span>
           <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "8px" }}>
             {[
-              { id: "dashboard", label: "Dashboard", icon: "📊" },
-              { id: "dna", label: "Style DNA", icon: "🧬" },
-              { id: "inspiration", label: "Inspiration", icon: "🖼" }
+              { id: "dashboard", label: "Dashboard", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> },
+              { id: "dna", label: "Style DNA", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 15c6.667-6 13.333 0 20-6"/><path d="M9 22c1.798-1.998 2.518-3.995 2.807-5.993"/><path d="M15 2c-1.798 1.998-2.518 3.995-2.807 5.993"/><path d="m17 6-2.5-2.5"/><path d="m14 8-1-1"/><path d="m7 18 2.5 2.5"/><path d="m10 16 1 1"/><path d="m2 9 20 6"/></svg> },
+              { id: "memory-graph", label: "Memory Graph", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v3l-5.5 7"/><path d="M12 10l5.5 7"/></svg> },
+              { id: "inspiration", label: "Inspiration", icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg> }
             ].map(item => {
               const isActive = page === item.id
               return (
@@ -220,7 +215,7 @@ export default function App() {
                     border: isActive ? "1px solid #e5e7eb" : "1px solid transparent"
                   }}
                 >
-                  <span style={{ marginRight: "10px" }}>{item.icon}</span>
+                  <span style={{ marginRight: "10px", display: "flex", alignItems: "center", color: isActive ? "#8b5cf6" : "#94a3b8" }}>{item.icon}</span>
                   {item.label}
                 </div>
               )
@@ -319,13 +314,17 @@ export default function App() {
         {page === "dna" && (
           <StyleDNA
             userId={DEMO_USER_ID}
+            projects={projects}
             onBack={() => handleNavigate("dashboard")}
           />
         )}
+        {page === "memory-graph" && (
+          <MemoryGraph projects={projects} onBack={() => handleNavigate("dashboard")} />
+        )}
         {page === "inspiration" && (
           <Inspiration
-            projectId={activeProjectId}
-            onBack={() => handleNavigate("chat")}
+            projectId={activeProjectId || projects[0]?.id}
+            onBack={() => handleNavigate(activeProjectId ? "chat" : "dashboard")}
           />
         )}
       </div>

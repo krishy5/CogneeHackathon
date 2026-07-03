@@ -12,13 +12,20 @@ from memory import init_cognee
 from routes.chat import router as chat_router
 from routes.ingest import router as ingest_router
 from routes.dna import router as dna_router
+from routes.search import router as search_router
+from routes.memory import router as memory_router
 
 app = FastAPI(title="StudioMind API", version="1.0.0")
 
-# CORS — allow React dev server on port 5173
+# CORS — allow React dev server and production Vercel URL
+ORIGINS = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    os.getenv("FRONTEND_URL", ""),
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://localhost:3000"],
+    allow_origins=[o for o in ORIGINS if o],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -37,6 +44,8 @@ async def startup():
 app.include_router(chat_router)
 app.include_router(ingest_router)
 app.include_router(dna_router)
+app.include_router(search_router)
+app.include_router(memory_router)
 
 @app.get("/health")
 async def health():

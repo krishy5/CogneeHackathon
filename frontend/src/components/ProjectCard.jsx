@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react"
 
-export default function ProjectCard({ project, onClick }) {
+export default function ProjectCard({ project, onClick, onDelete }) {
   const [hovered, setHovered] = useState(false)
   const [memoryCount, setMemoryCount] = useState(0)
 
@@ -53,6 +53,23 @@ export default function ProjectCard({ project, onClick }) {
           backgroundColor: project.color,
           animation: "slideInLeft 0.2s ease-out forwards"
         }} />
+      )}
+
+      {/* Delete button */}
+      {hovered && onDelete && (
+        <button
+          onClick={e => { e.stopPropagation(); onDelete() }}
+          style={{
+            position: "absolute", top: "12px", right: "12px",
+            background: "#fef2f2", border: "1px solid #fecaca",
+            borderRadius: "8px", padding: "4px 8px",
+            cursor: "pointer", display: "flex", alignItems: "center", gap: "4px",
+            fontSize: "11px", fontWeight: "600", color: "#ef4444", zIndex: 10
+          }}
+        >
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+          Delete
+        </button>
       )}
 
       {/* Header Area */}
