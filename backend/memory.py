@@ -142,12 +142,18 @@ Be thorough — extract every design detail mentioned, even implicitly.
 Preserve exact values: hex codes, px/rem measurements, font names."""
 
 
+def _cognee_configured() -> bool:
+    return all(os.getenv(k) for k in ("COGNEE_BASE_URL", "COGNEE_API_KEY", "COGNEE_TENANT_ID"))
+
+
 def _client() -> httpx.AsyncClient:
+    if not _cognee_configured():
+        raise RuntimeError("Cognee env vars not set")
     return httpx.AsyncClient(
-        base_url=os.environ["COGNEE_BASE_URL"],
+        base_url=os.getenv("COGNEE_BASE_URL"),
         headers={
-            "X-Api-Key": os.environ["COGNEE_API_KEY"],
-            "X-Tenant-Id": os.environ["COGNEE_TENANT_ID"],
+            "X-Api-Key": os.getenv("COGNEE_API_KEY"),
+            "X-Tenant-Id": os.getenv("COGNEE_TENANT_ID"),
             "Content-Type": "application/json",
         },
         timeout=10.0,
@@ -155,6 +161,9 @@ def _client() -> httpx.AsyncClient:
 
 
 async def init_cognee():
+    if not _cognee_configured():
+        print("Cognee env vars not set — running without Cognee memory.")
+        return
     async with _client() as c:
         r = await c.get("/health")
         r.raise_for_status()
@@ -162,6 +171,8 @@ async def init_cognee():
 
 
 async def save_memory(text: str, project_id: str, tags: list = None) -> None:
+    if not _cognee_configured():
+        return
     dataset = f"project_{project_id}"
     async with _client() as c:
         # 1. Store as session QA entry (fast, appears in Sessions view)
@@ -193,6 +204,8 @@ async def save_memory(text: str, project_id: str, tags: list = None) -> None:
 
 
 async def fetch_memory(query: str, project_id: str) -> str:
+    if not _cognee_configured():
+        return ""
     dataset = f"project_{project_id}"
     try:
         async with _client() as c:
@@ -218,6 +231,8 @@ async def fetch_memory(query: str, project_id: str) -> str:
 
 
 async def improve_memory(feedback: str, project_id: str) -> None:
+    if not _cognee_configured():
+        return
     dataset = f"project_{project_id}"
     is_positive = feedback.startswith("thumbsup")
     score = 5 if is_positive else 1
@@ -253,6 +268,8 @@ async def forget_memory(project_id: str, memory_id: str = None) -> int:
 
 
 async def ingest_url(url: str, project_id: str) -> None:
+    if not _cognee_configured():
+        return
     dataset = f"project_{project_id}"
     text = f"Style reference: {url}"
     async with _client() as c:
@@ -277,6 +294,8 @@ async def ingest_url(url: str, project_id: str) -> None:
 
 
 async def get_style_dna(user_id: str) -> str:
+    if not _cognee_configured():
+        return ""
     try:
         async with _client() as c:
             r = await c.get("/api/v1/datasets/")
@@ -307,6 +326,8 @@ async def get_style_dna(user_id: str) -> str:
 
 
 async def list_memories(project_id: str) -> list:
+    if not _cognee_configured():
+        return []
     dataset = f"project_{project_id}"
     try:
         async with _client() as c:
@@ -343,6 +364,8 @@ async def _get_dataset_id(name: str) -> str | None:
 
 
 async def get_graph(project_id: str) -> dict:
+    if not _cognee_configured():
+        return {"nodes": [], "edges": []}
     dataset = f"project_{project_id}"
     try:
         ds_id = await _get_dataset_id(dataset)
