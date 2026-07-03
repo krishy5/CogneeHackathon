@@ -17,16 +17,11 @@ from routes.memory import router as memory_router
 
 app = FastAPI(title="StudioMind API", version="1.0.0")
 
-# CORS — allow React dev server and production Vercel URL
-ORIGINS = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    os.getenv("FRONTEND_URL", ""),
-]
+# CORS — allow all origins (hackathon deployment)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[o for o in ORIGINS if o],
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
