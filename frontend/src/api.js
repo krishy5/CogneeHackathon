@@ -1,5 +1,5 @@
 const BASE = typeof window !== "undefined" && window.location.hostname !== "localhost"
-  ? "https://studiomind-backend.onrender.com/api"
+  ? "https://cogneehackathon.onrender.com/api"
   : "/api"
 
 // ── localStorage helpers ─────────────────────────────────────────────────────
