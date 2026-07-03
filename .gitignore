@@ -16,3 +16,4 @@ frontend/dist/
 
 # Secrets
 api.txt
+frontend/test_*.cjs
