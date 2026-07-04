@@ -14,6 +14,8 @@ from routes.ingest import router as ingest_router
 from routes.dna import router as dna_router
 from routes.search import router as search_router
 from routes.memory import router as memory_router
+from routes.auth import router as auth_router
+from routes.projects import router as projects_router
 
 app = FastAPI(title="StudioMind API", version="1.0.0")
 
@@ -41,6 +43,8 @@ app.include_router(ingest_router)
 app.include_router(dna_router)
 app.include_router(search_router)
 app.include_router(memory_router)
+app.include_router(auth_router)
+app.include_router(projects_router)
 
 @app.get("/health")
 async def health():

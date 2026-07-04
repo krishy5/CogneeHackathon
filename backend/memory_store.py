@@ -2,7 +2,7 @@ import sqlite3
 import json
 import os
 import hashlib
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 import numpy as np
 
@@ -82,9 +82,9 @@ class MemoryStore:
     # remember() — store with embedding + entity extraction
     # ------------------------------------------------------------------
     async def remember(self, text: str, dataset: str, tags: list = None, ttl_days: int = 90) -> str:
-        mem_id = hashlib.sha256(f"{dataset}:{text}:{datetime.utcnow().isoformat()}".encode()).hexdigest()[:16]
+        mem_id = hashlib.sha256(f"{dataset}:{text}:{datetime.now(timezone.utc).isoformat()}".encode()).hexdigest()[:16]
         embedding = _embed(text)
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         # Extract simple entities (design-domain keywords)
         extracted_tags = tags or _extract_tags(text)
@@ -111,7 +111,7 @@ class MemoryStore:
     # ------------------------------------------------------------------
     async def recall(self, query: str, dataset: str, top_k: int = 6) -> List[str]:
         query_vec = _embed(query)
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc)
 
         with self._conn() as conn:
             rows = conn.execute(
@@ -150,7 +150,7 @@ class MemoryStore:
                 conn.execute("""
                     UPDATE memories SET access_count = access_count + 1, accessed_at = ?
                     WHERE id = ?
-                """, (datetime.utcnow().isoformat(), mid))
+                """, (datetime.now(timezone.utc).isoformat(), mid))
 
         return [r[2] for r in top]
 

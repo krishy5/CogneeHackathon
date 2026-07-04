@@ -41,7 +41,7 @@ async def _invoke_with_fallback(system_prompt: str, user_message: str) -> str:
             try:
                 llm = ChatGoogleGenerativeAI(model=model, google_api_key=gemini_key, temperature=0.7)
                 import asyncio
-                response = await asyncio.get_event_loop().run_in_executor(
+                response = await asyncio.get_running_loop().run_in_executor(
                     None, lambda l=llm: l.invoke([SystemMessage(content=system_prompt), HumanMessage(content=user_message)])
                 )
                 return response.content

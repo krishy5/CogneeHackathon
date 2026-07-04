@@ -4,194 +4,183 @@ import Chat from "./pages/Chat"
 import StyleDNA from "./pages/StyleDNA"
 import Inspiration from "./pages/Inspiration"
 import MemoryGraph from "./pages/MemoryGraph"
+import AuthPage from "./pages/AuthPage"
+import { getSession, saveSession, clearSession, fetchProjects, persistProjects } from "./auth"
 
-const DEMO_USER_ID = "user_demo_001"
+function AuthModal({ mode: initialMode, onAuth, onClose }) {
+  const [mode, setMode] = useState(initialMode)
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [name, setName] = useState("")
+  const [error, setError] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  const submit = async (e) => {
+    e.preventDefault()
+    if (!email.trim() || !password.trim()) return
+    setError(""); setLoading(true)
+    try {
+      const res = await fetch(mode === "login" ? "/api/auth/login" : "/api/auth/register", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, name })
+      })
+      const text = await res.text()
+      const data = text ? JSON.parse(text) : {}
+      if (!res.ok) throw new Error(data.detail || `Error ${res.status}`)
+      onAuth(data)
+    } catch (err) { setError(err.message) }
+    finally { setLoading(false) }
+  }
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}
+      onClick={e => e.target === e.currentTarget && onClose()}>
+      <div style={{ background: "#fff", borderRadius: "20px", padding: "36px 40px", width: "100%", maxWidth: "400px", boxShadow: "0 24px 60px rgba(0,0,0,0.15)", border: "1px solid #eef0f3" }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px" }}>
+          <h2 style={{ margin: 0, fontSize: "20px", fontWeight: "800", color: "#0f172a", fontFamily: "'Outfit', sans-serif" }}>
+            {mode === "login" ? "Welcome back" : "Create account"}
+          </h2>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", fontSize: "20px", lineHeight: 1 }}>×</button>
+        </div>
+        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {mode === "register" && <input value={name} onChange={e => setName(e.target.value)} placeholder="Your name" style={iStyle} onFocus={e => e.target.style.borderColor="#8b5cf6"} onBlur={e => e.target.style.borderColor="#e2e8f0"} />}
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Email" required style={iStyle} onFocus={e => e.target.style.borderColor="#8b5cf6"} onBlur={e => e.target.style.borderColor="#e2e8f0"} />
+          <input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="Password" required style={iStyle} onFocus={e => e.target.style.borderColor="#8b5cf6"} onBlur={e => e.target.style.borderColor="#e2e8f0"} />
+          {error && <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: "8px", padding: "10px 14px", fontSize: "13px", color: "#dc2626" }}>{error}</div>}
+          <button type="submit" disabled={loading} style={{ background: loading ? "#e2e8f0" : "linear-gradient(135deg,#8b5cf6,#6366f1)", color: loading ? "#94a3b8" : "#fff", border: "none", borderRadius: "10px", padding: "13px", fontSize: "14px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", marginTop: "4px" }}>
+            {loading ? "Please wait..." : mode === "login" ? "Sign In" : "Create Account"}
+          </button>
+        </form>
+        <div style={{ marginTop: "18px", textAlign: "center", fontSize: "13px", color: "#64748b" }}>
+          {mode === "login" ? "No account? " : "Have an account? "}
+          <button onClick={() => { setMode(mode === "login" ? "register" : "login"); setError("") }} style={{ background: "none", border: "none", color: "#8b5cf6", fontWeight: "700", cursor: "pointer", fontSize: "13px" }}>
+            {mode === "login" ? "Sign up" : "Sign in"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+const iStyle = { padding: "11px 14px", borderRadius: "10px", border: "1px solid #e2e8f0", fontSize: "13.5px", color: "#1e293b", outline: "none", transition: "border-color 0.15s", background: "#fafafa", width: "100%", boxSizing: "border-box" }
+
 const SEED_PROJECTS = [
-  { id: "proj_001", name: "Luminary App", description: "Meditation & sleep tracker", color: "#8b5cf6" }, // Purple
-  { id: "proj_002", name: "Forge Design System", description: "B2B SaaS component library", color: "#f59e0b" }, // Amber
-  { id: "proj_003", name: "Nova Brand", description: "Fintech startup identity", color: "#10b981" }, // Emerald
+  { id: "proj_001", name: "Luminary App", description: "Meditation & sleep tracker", color: "#8b5cf6" },
+  { id: "proj_002", name: "Forge Design System", description: "B2B SaaS component library", color: "#f59e0b" },
+  { id: "proj_003", name: "Nova Brand", description: "Fintech startup identity", color: "#10b981" },
 ]
 
 export default function App() {
-  const [page, setPage] = useState("dashboard") // dashboard | chat | dna | inspiration | memory-graph
+  const [session, setSession] = useState(getSession)
+  const [showAuth, setShowAuth] = useState(null) // null | "login" | "register"
+  const [page, setPage] = useState("dashboard")
   const [activeProjectId, setActiveProjectId] = useState(null)
   const [projects, setProjects] = useState([])
   const [searchQuery, setSearchQuery] = useState("")
 
-  // Initialize and load projects from localStorage
+  // Load projects from backend on login/refresh
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("studiomind_projects")
-      if (stored) {
-        try {
-          setProjects(JSON.parse(stored))
-        } catch (_) {
-          setProjects(SEED_PROJECTS)
-        }
-      } else {
-        localStorage.setItem("studiomind_projects", JSON.stringify(SEED_PROJECTS))
-        setProjects(SEED_PROJECTS)
-      }
-    }
-  }, [])
+    if (!session) return
+    fetchProjects().then(serverProjects => {
+      setProjects(serverProjects || [])
+    })
+  }, [session])
 
-  // Sync projects helper
+  const handleAuth = (data) => {
+    saveSession(data)
+    setSession(data)
+    setShowAuth(null)
+  }
+
+  const handleLogout = () => {
+    clearSession()
+    setSession(null)
+    setProjects([])
+    setPage("dashboard")
+  }
+
   const updateProjectsList = (newList) => {
     setProjects(newList)
-    if (typeof window !== "undefined") {
-      localStorage.setItem("studiomind_projects", JSON.stringify(newList))
-    }
+    persistProjects(newList)
   }
 
-  // Handle sidebar navigation
   const handleNavigate = (pageName, projectId = null) => {
     setPage(pageName)
-    if (projectId) {
-      setActiveProjectId(projectId)
-    }
+    if (projectId) setActiveProjectId(projectId)
   }
 
-  // Filter projects based on search query in the sidebar
-  const filteredProjects = projects.filter(p => 
+  if (!session) return (
+    <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f4f5f7", color: "#1e293b", overflow: "hidden", fontFamily: "'Inter', sans-serif" }}>
+      {/* Sidebar — guest mode */}
+      <div style={{ width: "250px", background: "#f9fafb", borderRight: "1px solid #e5e7eb", display: "flex", flexDirection: "column", padding: "24px 18px", boxSizing: "border-box", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "24px" }}>
+          <div style={{ width: "32px", height: "32px", backgroundColor: "#09090b", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <div style={{ width: "12px", height: "12px", border: "2px solid #fff", transform: "rotate(45deg)" }} />
+          </div>
+          <span style={{ fontSize: "16px", fontWeight: "800", color: "#09090b", fontFamily: "'Outfit', sans-serif" }}>StudioMind</span>
+        </div>
+        <div style={{ flex: 1 }} />
+        <div style={{ background: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.15)", borderRadius: "12px", padding: "16px" }}>
+          <p style={{ margin: "0 0 12px", fontSize: "13px", color: "#475569", lineHeight: "1.5" }}>Sign in to save your projects, chats, and memory across sessions.</p>
+          <button onClick={() => setShowAuth("login")} style={{ width: "100%", background: "linear-gradient(135deg, #8b5cf6, #6366f1)", color: "#fff", border: "none", borderRadius: "10px", padding: "10px", fontWeight: "700", fontSize: "13.5px", cursor: "pointer", marginBottom: "8px" }}>Sign In</button>
+          <button onClick={() => setShowAuth("register")} style={{ width: "100%", background: "#fff", color: "#6366f1", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "10px", fontWeight: "700", fontSize: "13.5px", cursor: "pointer" }}>Create Account</button>
+        </div>
+      </div>
+      {/* Main — guest dashboard */}
+      <div style={{ flex: 1, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <Dashboard projects={SEED_PROJECTS} onOpenProject={() => setShowAuth("login")} onViewDNA={() => setShowAuth("login")} onUpdateProjects={() => setShowAuth("login")} />
+      </div>
+      {/* Auth modal */}
+      {showAuth && <AuthModal mode={showAuth} onAuth={handleAuth} onClose={() => setShowAuth(null)} />}
+    </div>
+  )
+
+  const filteredProjects = projects.filter(p =>
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    p.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (p.description || "").toLowerCase().includes(searchQuery.toLowerCase())
   )
 
   return (
-    <div style={{
-      display: "flex",
-      height: "100vh",
-      width: "100vw",
-      background: "#f4f5f7",
-      color: "#1e293b",
-      overflow: "hidden",
-      fontFamily: "'Inter', sans-serif"
-    }}>
-      
-      {/* 2. LEFT INNER SIDEBAR (Navigation & Profile) */}
-      <div style={{
-        width: "250px",
-        background: "#f9fafb",
-        borderRight: "1px solid #e5e7eb",
-        display: "flex",
-        flexDirection: "column",
-        padding: "24px 18px",
-        boxSizing: "border-box",
-        flexShrink: 0
-      }}>
-        
-        {/* Brand Logo & Name */}
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "10px",
-          marginBottom: "24px",
-          paddingLeft: "4px"
-        }}>
-          <div style={{
-            width: "32px",
-            height: "32px",
-            backgroundColor: "#09090b",
-            borderRadius: "8px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            cursor: "pointer",
-            boxShadow: "0 4px 10px rgba(0,0,0,0.1)"
-          }} onClick={() => handleNavigate("dashboard")}>
-            <div style={{
-              width: "12px",
-              height: "12px",
-              border: "2px solid #ffffff",
-              transform: "rotate(45deg)"
-            }} />
+    <div style={{ display: "flex", height: "100vh", width: "100vw", background: "#f4f5f7", color: "#1e293b", overflow: "hidden", fontFamily: "'Inter', sans-serif" }}>
+
+      {/* Sidebar */}
+      <div style={{ width: "250px", background: "#f9fafb", borderRight: "1px solid #e5e7eb", display: "flex", flexDirection: "column", padding: "24px 18px", boxSizing: "border-box", flexShrink: 0 }}>
+
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "24px", paddingLeft: "4px" }}>
+          <div style={{ width: "32px", height: "32px", backgroundColor: "#09090b", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", boxShadow: "0 4px 10px rgba(0,0,0,0.1)" }}
+            onClick={() => handleNavigate("dashboard")}>
+            <div style={{ width: "12px", height: "12px", border: "2px solid #ffffff", transform: "rotate(45deg)" }} />
           </div>
-          <span style={{
-            fontSize: "16px",
-            fontWeight: "800",
-            color: "#09090b",
-            fontFamily: "'Outfit', sans-serif",
-            letterSpacing: "-0.01em"
-          }}>
-            StudioMind
-          </span>
+          <span style={{ fontSize: "16px", fontWeight: "800", color: "#09090b", fontFamily: "'Outfit', sans-serif", letterSpacing: "-0.01em" }}>StudioMind</span>
         </div>
 
-        {/* User Profile Block */}
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: "12px",
-          marginBottom: "28px"
-        }}>
-          {/* Avatar (Orange circle with illustration) */}
-          <div style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "50%",
-            backgroundColor: "#fed7aa",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "20px",
-            border: "2px solid #ffffff",
-            boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
-          }}>
-            👩‍🎨
+        {/* User Profile */}
+        <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "28px" }}>
+          <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: "linear-gradient(135deg, #8b5cf6, #6366f1)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "800", color: "#fff", flexShrink: 0 }}>
+            {session.name?.[0]?.toUpperCase() || "U"}
           </div>
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <span style={{ fontSize: "14px", fontWeight: "700", color: "#1e293b", fontFamily: "'Outfit', sans-serif" }}>
-              Sarah Wiliam
-            </span>
-            <span style={{ fontSize: "11px", color: "#64748b", fontWeight: "600" }}>
-              Pro Member
-            </span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e293b", fontFamily: "'Outfit', sans-serif", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.name}</div>
+            <div style={{ fontSize: "11px", color: "#64748b", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{session.email}</div>
           </div>
+          <button onClick={handleLogout} title="Sign out"
+            style={{ background: "none", border: "none", cursor: "pointer", color: "#94a3b8", padding: "4px", borderRadius: "6px", flexShrink: 0 }}
+            onMouseEnter={e => e.currentTarget.style.color = "#ef4444"}
+            onMouseLeave={e => e.currentTarget.style.color = "#94a3b8"}>
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          </button>
         </div>
 
-        {/* Search Bar pill */}
-        <div style={{
-          position: "relative",
-          marginBottom: "24px"
-        }}>
-          <input
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search canvas..."
-            style={{
-              width: "100%",
-              boxSizing: "border-box",
-              background: "#ffffff",
-              border: "1px solid #e5e7eb",
-              borderRadius: "10px",
-              padding: "10px 12px 10px 32px",
-              fontSize: "13px",
-              color: "#1e293b",
-              outline: "none"
-            }}
-          />
+        {/* Search */}
+        <div style={{ position: "relative", marginBottom: "24px" }}>
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Search canvas..."
+            style={{ width: "100%", boxSizing: "border-box", background: "#ffffff", border: "1px solid #e5e7eb", borderRadius: "10px", padding: "10px 12px 10px 32px", fontSize: "13px", color: "#1e293b", outline: "none" }} />
           <span style={{ position: "absolute", left: "10px", top: "50%", transform: "translateY(-50%)", display: "flex", alignItems: "center", color: "#94a3b8", pointerEvents: "none" }}>
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
           </span>
-          {/* Keyboard badge ⌘ S */}
-          <span style={{
-            position: "absolute",
-            right: "10px",
-            top: "50%",
-            transform: "translateY(-50%)",
-            fontSize: "10px",
-            color: "#94a3b8",
-            background: "#f3f4f6",
-            padding: "2px 4px",
-            borderRadius: "4px",
-            border: "1px solid #e5e7eb",
-            fontFamily: "monospace"
-          }}>
-            ⌘S
-          </span>
         </div>
 
-        {/* General Categories */}
+        {/* Nav */}
         <div style={{ marginBottom: "28px" }}>
           <span style={sidebarHeaderStyle}>General</span>
           <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "8px" }}>
@@ -203,18 +192,7 @@ export default function App() {
             ].map(item => {
               const isActive = page === item.id
               return (
-                <div
-                  key={item.id}
-                  onClick={() => handleNavigate(item.id)}
-                  style={{
-                    ...sidebarItemStyle,
-                    backgroundColor: isActive ? "#ffffff" : "transparent",
-                    color: isActive ? "#1e293b" : "#64748b",
-                    fontWeight: isActive ? "700" : "500",
-                    boxShadow: isActive ? "0 2px 8px rgba(0,0,0,0.03)" : "none",
-                    border: isActive ? "1px solid #e5e7eb" : "1px solid transparent"
-                  }}
-                >
+                <div key={item.id} onClick={() => handleNavigate(item.id)} style={{ ...sidebarItemStyle, backgroundColor: isActive ? "#ffffff" : "transparent", color: isActive ? "#1e293b" : "#64748b", fontWeight: isActive ? "700" : "500", boxShadow: isActive ? "0 2px 8px rgba(0,0,0,0.03)" : "none", border: isActive ? "1px solid #e5e7eb" : "1px solid transparent" }}>
                   <span style={{ marginRight: "10px", display: "flex", alignItems: "center", color: isActive ? "#8b5cf6" : "#94a3b8" }}>{item.icon}</span>
                   {item.label}
                 </div>
@@ -223,135 +201,43 @@ export default function App() {
           </div>
         </div>
 
-        {/* Dynamic Project Canvases (Private Space) */}
+        {/* Projects */}
         <div style={{ flex: 1, overflowY: "auto" }}>
           <span style={sidebarHeaderStyle}>Private Space</span>
           <div style={{ display: "flex", flexDirection: "column", gap: "4px", marginTop: "8px" }}>
             {filteredProjects.map(proj => {
               const isActive = page === "chat" && activeProjectId === proj.id
               return (
-                <div
-                  key={proj.id}
-                  onClick={() => handleNavigate("chat", proj.id)}
-                  style={{
-                    ...sidebarItemStyle,
-                    backgroundColor: isActive ? "#ffffff" : "transparent",
-                    color: isActive ? "#1e293b" : "#64748b",
-                    fontWeight: isActive ? "700" : "500",
-                    boxShadow: isActive ? "0 2px 8px rgba(0,0,0,0.03)" : "none",
-                    border: isActive ? "1px solid #e5e7eb" : "1px solid transparent"
-                  }}
-                >
-                  {/* Small color dot accent */}
-                  <div style={{
-                    width: "8px",
-                    height: "8px",
-                    borderRadius: "50%",
-                    backgroundColor: proj.color,
-                    marginRight: "12px",
-                    boxShadow: `0 0 6px ${proj.color}`
-                  }} />
-                  <span style={{
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    whiteSpace: "nowrap",
-                    flex: 1
-                  }}>
-                    {proj.name}
-                  </span>
+                <div key={proj.id} onClick={() => handleNavigate("chat", proj.id)} style={{ ...sidebarItemStyle, backgroundColor: isActive ? "#ffffff" : "transparent", color: isActive ? "#1e293b" : "#64748b", fontWeight: isActive ? "700" : "500", boxShadow: isActive ? "0 2px 8px rgba(0,0,0,0.03)" : "none", border: isActive ? "1px solid #e5e7eb" : "1px solid transparent" }}>
+                  <div style={{ width: "8px", height: "8px", borderRadius: "50%", backgroundColor: proj.color, marginRight: "12px", flexShrink: 0, boxShadow: `0 0 6px ${proj.color}` }} />
+                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{proj.name}</span>
                 </div>
               )
             })}
-            
             {filteredProjects.length === 0 && (
-              <div style={{ fontSize: "12px", color: "#94a3b8", padding: "8px 12px", fontStyle: "italic" }}>
-                No canvas found
-              </div>
+              <div style={{ fontSize: "12px", color: "#94a3b8", padding: "8px 12px", fontStyle: "italic" }}>No canvas found</div>
             )}
           </div>
         </div>
 
-        {/* Bottom Info badge */}
-        <div style={{
-          background: "rgba(99, 102, 241, 0.05)",
-          border: "1px solid rgba(99, 102, 241, 0.1)",
-          borderRadius: "12px",
-          padding: "12px 14px",
-          marginTop: "auto"
-        }}>
-          <span style={{ fontSize: "11px", color: "#6366f1", fontWeight: "700", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>
-            Memory Sync
-          </span>
-          <span style={{ fontSize: "11.5px", color: "#64748b", lineHeight: "1.4", display: "block" }}>
-            Cognee namespace active on local sandbox.
-          </span>
+        {/* Memory badge */}
+        <div style={{ background: "rgba(99,102,241,0.05)", border: "1px solid rgba(99,102,241,0.1)", borderRadius: "12px", padding: "12px 14px", marginTop: "16px" }}>
+          <span style={{ fontSize: "11px", color: "#6366f1", fontWeight: "700", textTransform: "uppercase", display: "block", marginBottom: "4px" }}>Memory Sync</span>
+          <span style={{ fontSize: "11.5px", color: "#64748b", lineHeight: "1.4", display: "block" }}>Cognee namespace: {session.user_id}</span>
         </div>
       </div>
 
-      {/* 3. MAIN WORKSPACE CONTENT PANEL */}
-      <div style={{
-        flex: 1,
-        height: "100%",
-        display: "flex",
-        flexDirection: "column",
-        overflow: "hidden"
-      }}>
-        {page === "dashboard" && (
-          <Dashboard
-            projects={projects}
-            onOpenProject={(id) => handleNavigate("chat", id)}
-            onViewDNA={() => handleNavigate("dna")}
-            onUpdateProjects={updateProjectsList}
-          />
-        )}
-        {page === "chat" && (
-          <Chat
-            projectId={activeProjectId}
-            onBack={() => handleNavigate("dashboard")}
-            onInspiration={() => handleNavigate("inspiration")}
-          />
-        )}
-        {page === "dna" && (
-          <StyleDNA
-            userId={DEMO_USER_ID}
-            projects={projects}
-            onBack={() => handleNavigate("dashboard")}
-          />
-        )}
-        {page === "memory-graph" && (
-          <MemoryGraph projects={projects} onBack={() => handleNavigate("dashboard")} />
-        )}
-        {page === "inspiration" && (
-          <Inspiration
-            projectId={activeProjectId || projects[0]?.id}
-            onBack={() => handleNavigate(activeProjectId ? "chat" : "dashboard")}
-          />
-        )}
+      {/* Main content */}
+      <div style={{ flex: 1, height: "100%", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        {page === "dashboard" && <Dashboard projects={projects} onOpenProject={id => handleNavigate("chat", id)} onViewDNA={() => handleNavigate("dna")} onUpdateProjects={updateProjectsList} />}
+        {page === "chat" && <Chat projectId={activeProjectId} userId={session.user_id} onBack={() => handleNavigate("dashboard")} onInspiration={() => handleNavigate("inspiration")} />}
+        {page === "dna" && <StyleDNA userId={session.user_id} projects={projects} onBack={() => handleNavigate("dashboard")} />}
+        {page === "memory-graph" && <MemoryGraph projects={projects} onBack={() => handleNavigate("dashboard")} />}
+        {page === "inspiration" && <Inspiration projectId={activeProjectId || projects[0]?.id} onBack={() => handleNavigate(activeProjectId ? "chat" : "dashboard")} />}
       </div>
-
     </div>
   )
 }
 
-// Sidebar Styles Definitions
-const sidebarHeaderStyle = {
-  fontSize: "11px",
-  color: "#94a3b8",
-  textTransform: "uppercase",
-  fontWeight: "800",
-  letterSpacing: "0.08em",
-  display: "block",
-  paddingLeft: "10px"
-}
-
-const sidebarItemStyle = {
-  display: "flex",
-  alignItems: "center",
-  padding: "10px 14px",
-  borderRadius: "10px",
-  fontSize: "13.5px",
-  cursor: "pointer",
-  transition: "all 0.15s ease-in-out",
-  boxSizing: "border-box"
-}
-
+const sidebarHeaderStyle = { fontSize: "11px", color: "#94a3b8", textTransform: "uppercase", fontWeight: "800", letterSpacing: "0.08em", display: "block", paddingLeft: "10px" }
+const sidebarItemStyle = { display: "flex", alignItems: "center", padding: "10px 14px", borderRadius: "10px", fontSize: "13.5px", cursor: "pointer", transition: "all 0.15s ease-in-out", boxSizing: "border-box" }
