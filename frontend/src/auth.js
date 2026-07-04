@@ -1,4 +1,5 @@
 const BASE = import.meta.env.VITE_API_URL || "https://cogneehackathon.onrender.com/api"
+export const BACKEND = BASE
 
 // --- Session helpers ---
 export function getSession() {

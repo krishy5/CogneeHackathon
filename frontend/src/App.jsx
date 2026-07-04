@@ -5,7 +5,7 @@ import StyleDNA from "./pages/StyleDNA"
 import Inspiration from "./pages/Inspiration"
 import MemoryGraph from "./pages/MemoryGraph"
 import AuthPage from "./pages/AuthPage"
-import { getSession, saveSession, clearSession, fetchProjects, persistProjects } from "./auth"
+import { getSession, saveSession, clearSession, fetchProjects, persistProjects, BACKEND } from "./auth"
 
 function AuthModal({ mode: initialMode, onAuth, onClose }) {
   const [mode, setMode] = useState(initialMode)
@@ -20,12 +20,13 @@ function AuthModal({ mode: initialMode, onAuth, onClose }) {
     if (!email.trim() || !password.trim()) return
     setError(""); setLoading(true)
     try {
-      const res = await fetch(mode === "login" ? "/api/auth/login" : "/api/auth/register", {
+      const res = await fetch(mode === "login" ? `${BACKEND}/auth/login` : `${BACKEND}/auth/register`, {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, name })
       })
       const text = await res.text()
-      const data = text ? JSON.parse(text) : {}
+      let data = {}
+      try { data = text ? JSON.parse(text) : {} } catch { throw new Error("Backend unavailable, please try again") }
       if (!res.ok) throw new Error(data.detail || `Error ${res.status}`)
       onAuth(data)
     } catch (err) { setError(err.message) }
