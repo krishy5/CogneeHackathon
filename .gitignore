@@ -9,6 +9,7 @@ __pycache__/
 # Database & logs
 backend/cognee_data/*.db
 backend/*.log
+backend/cognee_data/
 
 # Node
 frontend/node_modules/
