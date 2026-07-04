@@ -22,8 +22,8 @@ class BasicAuthMiddleware(BaseHTTPMiddleware):
                     username, password = decoded.split(":", 1)
                     if password == PASSWORD:
                         return await call_next(request)
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"Auth middleware error: {e}")
         
         return Response(
             content="Authentication required",

@@ -1,6 +1,4 @@
-const BASE = typeof window !== "undefined" && window.location.hostname !== "localhost"
-  ? "https://cogneehackathon.onrender.com/api"
-  : "/api"
+const BASE = "/api"
 
 // ── localStorage helpers ─────────────────────────────────────────────────────
 const getLocal = (key, def = []) => {
@@ -14,26 +12,19 @@ const DEFAULT_STYLE = { tone: "professional", format: "mixed", detail: "balanced
 export const getReplyStyle = () => { try { const s = localStorage.getItem(STYLE_KEY); return s ? { ...DEFAULT_STYLE, ...JSON.parse(s) } : { ...DEFAULT_STYLE } } catch { return { ...DEFAULT_STYLE } } }
 export const setReplyStyle = (style) => localStorage.setItem(STYLE_KEY, JSON.stringify(style))
 
-// ── Gemini key (set via Vercel env var VITE_GEMINI_API_KEY) ──────────────────
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || ""
-export const getGeminiApiKey = () => GEMINI_API_KEY
-export const setGeminiApiKey = () => {}
+const GEMINI_KEY_STORAGE = "studiomind_gemini_key"
+const GEMINI_KEY_DEFAULT = ""
+export const getGeminiApiKey = () => localStorage.getItem(GEMINI_KEY_STORAGE) || GEMINI_KEY_DEFAULT
+export const setGeminiApiKey = (key) => localStorage.setItem(GEMINI_KEY_STORAGE, key)
 
-// ── Seed mock projects ───────────────────────────────────────────────────────
-const seedMockDatabase = () => {
-  if (!localStorage.getItem("studiomind_memories_proj_001"))
-    setLocal("studiomind_memories_proj_001", ["User started Luminary App project.", "Aesthetic target: Calming meditation dark tracker."])
-  if (!localStorage.getItem("studiomind_memories_proj_002"))
-    setLocal("studiomind_memories_proj_002", ["Project: Forge Design System.", "Aesthetic target: Structured SaaS design system."])
-}
-if (typeof window !== "undefined") seedMockDatabase()
+
 
 // ── Gemini fallback ──────────────────────────────────────────────────────────
 const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 const GEMINI_MODELS = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash"]
 
 async function callGemini(message, history, style) {
-  const apiKey = GEMINI_API_KEY
+  const apiKey = getGeminiApiKey()
   if (!apiKey) throw new Error("No Gemini API key configured")
   const systemPrompt = `You are StudioMind — a senior AI design partner with persistent memory.\nGive specific design recommendations with exact values (hex codes, rem/px, font names).\nTone: ${style.tone} | Detail: ${style.detail}`
   const contents = [
@@ -90,7 +81,15 @@ export const sendFeedback = async (type, messageContent, project_id) => {
 }
 
 // ── ingestURL ────────────────────────────────────────────────────────────────
+const ALLOWED_SCHEMES = ["http:", "https:"]
+
 export const ingestURL = async (url, project_id) => {
+  try {
+    const parsed = new URL(url)
+    if (!ALLOWED_SCHEMES.includes(parsed.protocol)) return { status: "error", message: "Invalid URL scheme" }
+  } catch {
+    return { status: "error", message: "Invalid URL" }
+  }
   try {
     await fetch(`${BASE}/ingest`, {
       method: "POST", headers: { "Content-Type": "application/json" },

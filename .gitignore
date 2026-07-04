@@ -6,6 +6,10 @@ __pycache__/
 *.pyo
 .cognee_system/
 
+# Database & logs
+backend/cognee_data/*.db
+backend/*.log
+
 # Node
 frontend/node_modules/
 frontend/dist/
