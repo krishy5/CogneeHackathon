@@ -1,4 +1,4 @@
-const BASE = "/api"
+const BASE = import.meta.env.VITE_API_URL || "https://cogneehackathon.onrender.com/api"
 
 // ── localStorage helpers ─────────────────────────────────────────────────────
 const getLocal = (key, def = []) => {
